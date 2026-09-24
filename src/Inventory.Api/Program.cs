@@ -1,4 +1,5 @@
 using Inventory.Api.Features.Products;
+using Inventory.Api.Features.Stock;
 using Inventory.Api.Features.Warehouses;
 using Inventory.Api.Shared.Errors;
 using Inventory.Api.Shared.Persistence;
@@ -31,6 +32,7 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddScoped<ProductStore>();
 builder.Services.AddScoped<WarehouseStore>();
+builder.Services.AddScoped<StockStore>();
 
 WebApplication app = builder.Build();
 
@@ -39,5 +41,6 @@ app.UseStatusCodePages();
 app.MapHealthChecks("/health");
 app.MapProductsEndpoints();
 app.MapWarehousesEndpoints();
+app.MapStockEndpoints();
 
 app.Run();

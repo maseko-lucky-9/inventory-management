@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS stock (
     product_id   bigint NOT NULL REFERENCES products (id) ON DELETE RESTRICT,
     warehouse_id bigint NOT NULL REFERENCES warehouses (id) ON DELETE RESTRICT,
     quantity     integer NOT NULL,
+    updated_at   timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (product_id, warehouse_id),
     CONSTRAINT stock_quantity_non_negative CHECK (quantity >= 0)
 );
