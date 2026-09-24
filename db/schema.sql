@@ -1,9 +1,9 @@
 -- Idempotent: applied on every startup under an advisory lock (ADR-005).
 CREATE TABLE IF NOT EXISTS products (
-    id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    code       text NOT NULL,
-    name       text NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now(),
+    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    code        text NOT NULL,
+    description text NOT NULL,
+    created_at  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT products_code_key UNIQUE (code)
 );
 
