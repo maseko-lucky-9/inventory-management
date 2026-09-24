@@ -2,7 +2,7 @@
 
 > **A RESTful inventory API in .NET (C#) over PostgreSQL, with a small Vue UI: products, warehouses, stock levels and warehouse-to-warehouse transfers that never oversell under concurrency. Tier built: Senior.**
 
-> **Status: built, Senior tier.** All endpoints, the concurrency strategy, JWT authentication with warehouse scoping in the data layer, the Vue UI and Docker Compose are in. `dotnet test` passes 123 unit and 154 integration tests (133 at the end of the four-hour build; the rest came with the additions made after it). What was not built is listed in [section 11](#11-what-i-knowingly-left-out); the time log is in [section 14](#14-time-log). This README was first drafted before the clock as design preparation and then corrected against the built code. The drafts and the build were AI-assisted (Claude Code), as disclosed in [section 13](#13-ai-usage).
+> **Status: built, Senior tier.** All endpoints, the concurrency strategy, JWT authentication with warehouse scoping in the data layer, the Vue UI and Docker Compose are in. `dotnet test` passes 123 unit and 161 integration tests (133 at the end of the four-hour build; the rest came with the additions made after it). What was not built is listed in [section 11](#11-what-i-knowingly-left-out); the time log is in [section 14](#14-time-log). This README was first drafted before the clock as design preparation and then corrected against the built code. The drafts and the build were AI-assisted (Claude Code), as disclosed in [section 13](#13-ai-usage).
 
 ## Constraints this repo follows
 
@@ -167,7 +167,7 @@ npx playwright install chromium
 npx playwright test
 ```
 
-The integration suite starts one PostgreSQL container per run and uses unique data per test, so there is no cleanup code. Last full run (`dotnet test`, 2026-09-24 20:46): `Passed! - Failed: 0, Passed: 123` (unit, 271 ms) and `Passed! - Failed: 0, Passed: 133` (integration, 9 s). After the post-build additions: `Passed! - Failed: 0, Passed: 154` (integration). The catalogue is in [section 10](#10-test-catalogue).
+The integration suite starts one PostgreSQL container per run and uses unique data per test, so there is no cleanup code. Last full run (`dotnet test`, 2026-09-24 20:46): `Passed! - Failed: 0, Passed: 123` (unit, 271 ms) and `Passed! - Failed: 0, Passed: 133` (integration, 9 s). After the post-build additions: `Passed! - Failed: 0, Passed: 161` (integration). The catalogue is in [section 10](#10-test-catalogue).
 
 ## 5. Example calls
 
@@ -284,6 +284,28 @@ Password: the value you set as `DemoUsers__Password` in your local `.env` (see `
 
 The seed also creates `WH-C`, linked to nobody. It seeds no products and no stock.
 
+### Demo data (optional)
+
+> **Added after the four-hour build.** Off by default, so the tests, CI and production never load it.
+
+To give the running app a realistic data set to play with, set `SEED_DEMO_DATA=true` in `.env` and run `docker compose up` (Compose passes it to the API as `Seed__DemoData`). With `dotnet run`, use `Seed__DemoData=true dotnet run --project src/Inventory.Api`. At startup, `SchemaInitializer` then applies `db/demo-data.sql` after `schema.sql` and `seed.sql`, in the same transaction under the same advisory lock. Every insert is insert-if-absent, stock included, so a restart never resets a level you changed by playing. Everything is read back through the normal endpoints.
+
+| Table | Demo rows | Total with the seed |
+|---|---|---|
+| `warehouses` | 8: factories `FAC-JHB`, `FAC-DBN`, `FAC-PTA`; distribution centres `DC-CPT`, `DC-PLZ`, `DC-BFN`, `DC-ELS`, `DC-PLK` | 11 |
+| `products` | 40: eight families of five, named by code prefix (`BRG` bearings, `BLT` bolts, `MTR` motors, `VLV` valves, `PMP` pumps, `GSK` gaskets, `CBL` cables, `FLT` filters) | 40 |
+| `user_warehouses` | 9 | 11 |
+| `stock` | 157 rows, 51,022 units. Each family is made in one factory and held in a few distribution centres; 9 rows are at 0 and 21 between 1 and 9, to demo a refused transfer. `WH-C` holds nothing | 157 |
+| `users`, `transfer_orders` | none | 3, 0 |
+
+| User | Sees (demo data on) |
+|---|---|
+| `alice` | `WH-A`, `FAC-JHB`, `FAC-PTA`, `DC-CPT`, `DC-PLZ` |
+| `bob` | `WH-B`, `FAC-DBN`, `DC-PLZ` (shared with alice), `DC-BFN`, `DC-ELS`, `DC-PLK` |
+| `carol` | nothing, still: the spec needs a user with no links |
+
+To try a refusal, log in as alice and transfer 10 of `VLV-BALL-DN50` out of `DC-PLZ`, which holds 6. Proven by `DemoDataTests` (6 cases, each on its own `postgres:17-alpine` container) and `DemoDataOffByDefaultTests` (1 case, on the shared fixture).
+
 ## 7. Concurrency strategy and its cost
 
 > **Concurrency strategy.** Transfers use a conditional `UPDATE` with a guard predicate (`quantity >= requested`) inside a single READ COMMITTED transaction, backed by a `CHECK (quantity >= 0)` constraint, and touch the two stock rows in ascending warehouse-id order. PostgreSQL re-evaluates the guard after any lock wait, so two simultaneous transfers of the same stock are serialised by the row lock and the second is refused if the first used the stock up — no application-level read-check-write exists. **Cost:** transfers of the same product out of the same warehouse queue behind each other for the length of one transaction, so a hot item is limited to roughly one transfer per transaction latency; waiting requests hold pooled connections, so a very hot item could exhaust the pool (mitigated with `lock_timeout`/`statement_timeout`); the "available" figure in the refusal message comes from a follow-up read and can already be stale when the client reads it; and part of the business rule lives in SQL, so it is proven by integration tests rather than unit tests. In exchange: one statement decides, there is no retry loop, and correctness does not depend on how many API instances run.
@@ -311,7 +333,7 @@ Each ADR records the context, the alternatives, the cost accepted, the proving t
 
 ## 10. Test catalogue
 
-Test names state their claim. Counts are test cases as `dotnet test --list-tests` lists them (a theory counts once per case): **123 unit, 154 integration (133 at the four-hour mark), 1 end-to-end spec**. All passed in the last run (section 4).
+Test names state their claim. Counts are test cases as `dotnet test --list-tests` lists them (a theory counts once per case): **123 unit, 161 integration (133 at the four-hour mark), 1 end-to-end spec**. All passed in the last run (section 4).
 
 Unit tests (`tests/Inventory.UnitTests`, no Docker, run by the pre-commit hook):
 
@@ -350,6 +372,7 @@ Integration tests (`tests/Inventory.IntegrationTests`: `WebApplicationFactory<Pr
 | `EndpointCoverageTests` | 17 | Every endpoint answers 503 `database_unavailable` when the database is unreachable; health answers 503; a padded product code is a duplicate; unknown body fields are ignored and never echoed | — |
 | `OpenApiTests` | 15 | `/openapi/v1.json` uses the contract's names, declares the Bearer scheme on every operation except login, tags and summarises each operation, documents each route's problem statuses, and is not served when disabled | That the documented statuses are the only ones the code can return |
 | `SwaggerUiTests` (added after the build) | 9 | The Swagger UI and document answer without a token when `OpenApi:Enabled` is on, read the built-in document, and answer 404 (signed in) or 401 (anonymous) when off, in any environment | How the UI renders |
+| `DemoDataTests`, `DemoDataOffByDefaultTests` (added after the build) | 7 | With `Seed:DemoData` on, the demo products and sites load, alice and bob see only their linked sites, carol sees none, and a second apply changes nothing; with it off (the default) no demo row exists | The realism of the demo figures |
 | `AuthTests` | 20 | Demo login returns an hour-long bearer token that opens protected routes; wrong password and unknown user get the same 401; tampered, expired and wrong-algorithm tokens are rejected; every route except login, health and the API document answers 401 without a token; signing-key and demo-password startup rules; 429 on the login limit | Token revocation (not built) |
 | `LoginRateLimitTests` | 5 | Clients behind a loopback proxy each get their own login window; a forwarded header from an untrusted address does not escape the window; a proxy in a configured network is trusted; a mistyped network stops startup | Distributed rate limiting |
 | `ScopingTests` | 10 | The warehouse list shows only linked warehouses; an unlinked warehouse answers exactly as an unknown one for queries, receipts and transfer sources; a transfer into an unlinked destination completes; the creator is auto-linked; carol sees nothing and can still create a product; the order records its creator | UI rendering |

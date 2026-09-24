@@ -1,6 +1,7 @@
 # ADR-005: Schema applied idempotently at startup
 
 - Status: Accepted. Amended by [ADR-008](008-sql-placement-and-inline-scope-join.md): `UserStore`, not `SchemaInitializer`, sets the demo users' password hashes
+- Amended after the four-hour build (2026-09-24): when `Seed:DemoData` is true (off by default; `SEED_DEMO_DATA` in Compose), `SchemaInitializer` also applies `db/demo-data.sql` after `seed.sql`, in the same transaction under the same advisory lock.
 - Date: 2026-09-24
 - Deciders: Thulani Maseko
 - Traces: H2, H3, H4, H9, T11, G3, G20, G22, G23, G24, G34, R8; FR-015, FR-016, FR-018

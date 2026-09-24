@@ -35,6 +35,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>The password the host hashes into the demo users at startup.</summary>
     public string DemoPassword { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
 
+    /// <summary>Turns on Seed:DemoData for a factory a test builds itself. The shared fixture leaves it unset, as production does.</summary>
+    public bool DemoData { get; init; }
+
     public Task InitializeAsync() => database.StartAsync();
 
     // UseSetting reaches Program's configuration before Build(), unlike ConfigureAppConfiguration.
@@ -46,6 +49,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("DemoUsers:Password", DemoPassword);
         // Far above what the suite needs; the rate-limit test builds its own host with a limit of one.
         builder.UseSetting("RateLimiting:LoginPermitLimit", "1000");
+        // Set only when asked for, so the shared fixture runs on the real default.
+        if (DemoData)
+        {
+            builder.UseSetting("Seed:DemoData", "true");
+        }
     }
 
     /// <summary>A client signed in as the given user, whose row is created if it is missing.</summary>

@@ -27,6 +27,8 @@ services:
       DemoUsers__Password: ${DemoUsers__Password:-}
       # Added after the four-hour build: OPENAPI_ENABLED=true serves the Swagger UI at /swagger (local use only).
       OpenApi__Enabled: ${OPENAPI_ENABLED:-false}
+      # Added after the four-hour build: optional demo products, factories and stock for local play (db/demo-data.sql).
+      Seed__DemoData: ${SEED_DEMO_DATA:-false}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
