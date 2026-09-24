@@ -316,7 +316,7 @@ These are designed but not built, by choice. **Completed at T21**, which adds an
 - **Backups and disaster recovery:** daily `pg_dump`, RPO 24 h, RTO 1 h by restore. Designed only.
 - **Production schema delivery:** a migration job and a least-privilege database role instead of runtime DDL.
 - **TLS termination** at a reverse proxy in a real deployment.
-- **Read replicas, partitioning of `transfer_orders`, caching.** Not needed at the assumed load.
+- **Read replicas, partitioning of `transfer_orders`, caching, a load balancer, a message queue.** Not needed at the assumed read-heavy load: about 100 daily users, with a peak of 20 reads/s and 2 writes/s (section 12).
 - **The UI in Compose.** Compose is API + database, as written (question 6).
 - **Persistent UI login.** The token lives in memory and is lost on reload.
 - **`GET /orders`** is an optional D10 item and is built only if time allows.
@@ -337,7 +337,7 @@ Specification questions sent to SCAD on 2026-09-24. Until an answer arrives, the
 | 4 | Are product and warehouse codes case-sensitive? | Yes, stored as entered after trimming | Pending |
 | 5 | Are update and delete for products and warehouses expected (§2 "CRUD"), or is §4 the full surface? | §4 is the surface; update/delete listed under "left out" | Pending |
 | 6 | Should Docker Compose run only the API and the database, or the UI as well? | API + database | Pending |
-| 7 | Expected volume: total and daily active users, read-to-write ratio, data size (products, warehouses, transfers per day)? Decides read-heavy vs write-heavy | ~100 daily users; 50 warehouses; 10,000 products; 1,000 transfers/day; peak 20 reads/s and 2 writes/s (≈10:1, read-heavy); under 100 MB in year one `[ASSUMED]` | Pending |
+| 7 | Expected volume: total and daily active users, read-to-write ratio, data size (products, warehouses, transfers per day)? Decides read-heavy vs write-heavy | ~100 daily users; 50 warehouses; 10,000 products; 1,000 transfers/day; peak 20 reads/s and 2 writes/s (≈10:1, read-heavy); under 100 MB in year one `[ASSUMED]` | Pending; default adopted as the working baseline |
 
 Other assumptions:
 
@@ -346,7 +346,13 @@ Other assumptions:
 - `GET /stock` needs at least one filter (else 400). Both filters mean the intersection. An unknown code returns 404. A drained row shows 0.
 - A source warehouse with no stock row for the product has 0 available, so the transfer is refused with `insufficient_stock`, not 404.
 - Products are a global catalogue; warehouses, stock and transfers are scoped. A transfer's destination may be any existing warehouse. Links come from the seed and from creator auto-linking.
-- Load: 50 warehouses, 10,000 products, 20 reads/s and 2 writes/s at peak, p95 under 200 ms `[ASSUMED]`. One API instance and one database carry this.
+- Load `[ASSUMED]`: this is the working baseline until SCAD answers question 7.
+  - About 100 daily users, 50 warehouses, 10,000 products and 1,000 transfers a day.
+  - That's a peak of around 20 reads and 2 writes a second, so roughly 10 reads to every write, which makes it read-heavy.
+  - That's well under 100 MB of data in the first year: about 50 MB of stock rows plus about 40 MB of transfer history a year.
+  - Target: p95 under 200 ms per endpoint.
+  - One API instance and one database carry this. Every read path is index-backed, and no cache, read replica or queue is built.
+  - If the real load turns out write-heavy, the concurrency ceiling of about 200–500 transfers a second on one item is the first thing to revisit (ADR-003).
 - .NET 10 is the current LTS and the password hasher ships in the shared framework `[UNVERIFIED — confirm with dotnet --list-sdks and a build on the day]`.
 - The grader has Docker and the .NET 10 SDK. `global.json` pins the SDK.
 - No starter repository has been received.

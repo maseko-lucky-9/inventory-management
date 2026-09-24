@@ -22,6 +22,33 @@ Pre-build. Only `CLAUDE.md`, `README.md`, `.env.example`, `docs/spec.md`, `docs/
 | UI | Vue 3 + Vite + TypeScript, Vue Router, fetch wrapper; Vite dev proxy (same origin, no CORS) |
 | Packaging | Multi-stage Dockerfile; Docker Compose (API + Postgres, health-gated) |
 
+## Capacity baseline (working assumption `[ASSUMED]`)
+
+The assignment gives no volume figures. Question 7 of the email to SCAD asks for them. Until they answer, the build uses this baseline (user ruling, 2026-09-24):
+
+| Figure | Value |
+|---|---|
+| Users | About 100 daily users |
+| Data | 50 warehouses, 10,000 products, up to 500,000 stock rows |
+| Writes | About 1,000 transfers a day |
+| Peak traffic | About 20 reads/s and 2 writes/s: roughly 10 reads to every write, so **read-heavy** |
+| Storage | Well under 100 MB in the first year (stock ~50 MB, transfer history ~40 MB a year) |
+| Latency target | p95 under 200 ms per endpoint |
+
+What it means for the code:
+
+- One API instance and one PostgreSQL instance. Don't add a cache, read replica, queue, partitioning or load balancer; none is needed at this load, and the README lists each as left out.
+- Every read path is index-backed:
+  - unique indexes on `products.code`, `warehouses.code` and `users.username`;
+  - stock primary key (`product_id`, `warehouse_id`) plus a secondary index on `stock.warehouse_id`;
+  - link primary key plus a secondary index on `user_warehouses.warehouse_id`;
+  - `transfer_orders(created_at)`.
+
+  A new read query ships with the index it uses.
+- Writes are rare, so the guarded UPDATE's row lock isn't a bottleneck. Its ceiling is about 200–500 transfers a second on one (product, source) pair.
+- The Npgsql pool is capped at 50 per instance.
+- Revisit if SCAD's answer is write-heavy, or if one item's transfer rate approaches that ceiling. Revisit ADR-003 before adding infrastructure.
+
 ## Layout (built up from T00 to T20)
 
 ```text
