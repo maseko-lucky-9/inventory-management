@@ -50,7 +50,7 @@ public sealed class StockStore(NpgsqlDataSource dataSource)
                 ? new UnknownCodeException("warehouse", warehouseCode)
                 : new UnknownCodeException("product", productCode));
         }
-        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", productCode) is { } refusal)
+        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", productCode, exception) is { } refusal)
         {
             throw refusal;
         }
@@ -74,7 +74,7 @@ public sealed class StockStore(NpgsqlDataSource dataSource)
 
             return levels;
         }
-        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", productCode ?? "") is { } refusal)
+        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", productCode ?? "", exception) is { } refusal)
         {
             throw refusal;
         }

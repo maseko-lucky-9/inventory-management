@@ -1,4 +1,5 @@
 using Inventory.Api.Shared.Errors;
+using Npgsql;
 
 namespace Inventory.UnitTests;
 
@@ -17,6 +18,26 @@ public sealed class DbErrorTranslatorTests
     [InlineData(null, typeof(DatabaseUnavailableException))]
     public void ExpectedDatabaseFailuresBecomeDomainErrors(string? sqlState, Type expected) =>
         Assert.IsType(expected, DbErrorTranslator.Translate(sqlState, "product", "SKU-1"));
+
+    // The 5xx log line must still say which failure it was (a deadlock is not a lock timeout).
+    [Theory]
+    [InlineData("23505")]
+    [InlineData("22003")]
+    [InlineData("40P01")]
+    [InlineData("55P03")]
+    [InlineData("57014")]
+    [InlineData("08006")]
+    [InlineData(null)]
+    public void RefusalKeepsTheDatabaseErrorAsItsCause(string? sqlState)
+    {
+        NpgsqlException cause = sqlState is null
+            ? new NpgsqlException("Exception while reading from stream")
+            : new PostgresException("database failure", "ERROR", "ERROR", sqlState);
+
+        DomainException refusal = DbErrorTranslator.Translate(sqlState, "product", "SKU-1", cause)!;
+
+        Assert.Same(cause, refusal.InnerException);
+    }
 
     [Fact]
     public void CheckViolationIsADefectNotARefusal() =>

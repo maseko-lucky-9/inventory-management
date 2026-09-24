@@ -29,7 +29,7 @@ public sealed class WarehouseStore(NpgsqlDataSource dataSource)
             return warehouses.AsList();
         }
         // A read names no code; the translator only needs one for a duplicate, which a SELECT cannot raise.
-        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "warehouse", string.Empty) is { } refusal)
+        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "warehouse", string.Empty, exception) is { } refusal)
         {
             throw refusal;
         }
@@ -43,7 +43,7 @@ public sealed class WarehouseStore(NpgsqlDataSource dataSource)
             return await connection.QuerySingleAsync<Warehouse>(
                 new CommandDefinition(InsertSql, new { Code = code, Name = name }, cancellationToken: cancellationToken));
         }
-        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "warehouse", code) is { } refusal)
+        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "warehouse", code, exception) is { } refusal)
         {
             throw refusal;
         }

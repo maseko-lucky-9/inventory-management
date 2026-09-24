@@ -72,5 +72,5 @@ public sealed class ProductStore(NpgsqlDataSource dataSource)
     // Reads translate too, so an outage is 503 database_unavailable on every path; unmapped states stay 500 defects.
     // The code only reaches a 23505 duplicate, which a read cannot raise.
     private static DomainException? Refusal(NpgsqlException exception, string code) =>
-        DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", code);
+        DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", code, exception);
 }

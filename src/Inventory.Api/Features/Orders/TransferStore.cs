@@ -54,7 +54,7 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
                 : transaction.RollbackAsync(cancellationToken));
             return outcome;
         }
-        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", command.ProductCode) is { } refusal)
+        catch (NpgsqlException exception) when (DbErrorTranslator.Translate((exception as PostgresException)?.SqlState, "product", command.ProductCode, exception) is { } refusal)
         {
             throw refusal;
         }
