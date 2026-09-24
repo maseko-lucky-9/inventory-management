@@ -1,4 +1,5 @@
 using Inventory.Api.Features.Products;
+using Inventory.Api.Features.Warehouses;
 using Inventory.Api.Shared.Errors;
 using Inventory.Api.Shared.Persistence;
 using Npgsql;
@@ -29,6 +30,7 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddScoped<ProductStore>();
+builder.Services.AddScoped<WarehouseStore>();
 
 WebApplication app = builder.Build();
 
@@ -36,5 +38,6 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.MapHealthChecks("/health");
 app.MapProductsEndpoints();
+app.MapWarehousesEndpoints();
 
 app.Run();
