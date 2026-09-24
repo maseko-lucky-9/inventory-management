@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+
+# Local secrets and tooling state
+.env
+tasks/
+.playwright-cli/
+
+# UI
+node_modules/
+dist/
+test-results/
+playwright-report/
+
+# Tests and IDEs
+TestResults/
+.vs/
+.idea/
+*.user
+.DS_Store

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Never commit a red build, red unit tests or a banned package.
+set -euo pipefail
+dotnet format whitespace Inventory.slnx --verify-no-changes
+dotnet build Inventory.slnx --nologo -v q
+dotnet test tests/Inventory.UnitTests --no-build --nologo -v q
+scripts/check-constraints.sh
+if git diff --cached --name-only | grep -q '^ui/'; then
+  npm --prefix ui run build
+fi
