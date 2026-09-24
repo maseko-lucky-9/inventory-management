@@ -1,6 +1,6 @@
 # ADR-004: Domain exceptions, Problem Details and FluentValidation
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-09-24: a body with a content type other than JSON returns 415 `unsupported_media_type` in the same envelope, because the framework rejects it before binding
 - Date: 2026-09-24
 - Deciders: Thulani Maseko
 - Traces: B2, B3, B5, E3, E10, E12, E13, U3, G8, G11, G13, G15, G29, G39; FR-010, FR-011, FR-020; constitution VII

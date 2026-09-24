@@ -113,7 +113,7 @@ A user lists past transfer orders that touch their linked warehouses.
 - Destination increment would overflow → 400 `quantity_out_of_range`, transaction rolled back.
 - Source has no stock row (treated as 0).
 - Codes with surrounding whitespace (trimmed), over 50 characters, or with characters outside letters, digits, `.`, `_`, `-`.
-- Malformed JSON, empty body, wrong content type → 400 with the standard envelope.
+- Malformed JSON or an empty body → 400 `malformed_request`; a body with a content type other than JSON → 415 `unsupported_media_type`. Both use the standard envelope.
 - Unknown JSON fields → ignored.
 - Both `productCode` and `warehouseCode` on `GET /stock` → intersection.
 - Two users create the same warehouse code at the same instant → one 409.

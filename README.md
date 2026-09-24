@@ -32,10 +32,12 @@ Activate the hooks once per clone. The pre-submit history audit is the last thre
 ```bash
 git config core.hooksPath .githooks
 
-git log --format=%s | grep -Ev '^(feat|fix|test|docs|chore|refactor|build|ci)\((repo|api|db|products|warehouses|stock|orders|auth|ui|e2e|compose|readme|tests)\): [a-z].{8,}$'
-git log --format=%s | awk 'length > 72'
+git log --format=%s c677f05..HEAD | grep -Ev '^(feat|fix|test|docs|chore|refactor|build|ci)\((repo|api|db|products|warehouses|stock|orders|auth|ui|e2e|compose|readme|tests)\): [a-z].{8,}$'
+git log --format=%s c677f05..HEAD | awk 'length > 72'
 git log --merges --oneline
 ```
+
+The audit starts after `c677f05`. Two pre-clock documentation commits, `17073e0` and `c677f05`, were made before the hooks existed and their subjects break the rule above. They are left as they are rather than rewriting pushed history.
 
 If SCAD sends a starter repository, its README takes precedence over this design (A1). Its code pattern is followed even where I disagree, and the objection is recorded here (A4).
 
@@ -74,6 +76,8 @@ docker compose up
 ```
 
 Compose starts `postgres:17-alpine` with a `pg_isready` health check and a named volume. The API starts only once the database reports healthy. It gets its connection string and secrets from the environment (`.env`), applies `db/schema.sql` and `db/seed.sql` at startup, and hashes `DemoUsers__Password` for the demo users. Compose runs the API and the database only, as the assignment describes (question 6 in section 12).
+
+Under Compose the API runs in the Production environment, so `Jwt__SigningKey` must be a real key of at least 32 bytes (`openssl rand -base64 48`). With the placeholder, or with no key, the API stops at startup and prints that command. The random-key fallback exists only in Development and Test.
 
 ### Option B: the assignment's `docker run` one-liner + `dotnet run`
 
@@ -169,6 +173,7 @@ Every non-2xx response is an RFC 9457 Problem Details document with `type`, `tit
 | Condition | Status | `code` |
 |---|---|---|
 | Malformed JSON, wrong types, empty body | 400 | `malformed_request` |
+| Body sent with a content type other than JSON | 415 | `unsupported_media_type` |
 | Field rule broken, self-transfer, missing stock filter | 400 | `validation_failed` |
 | Unknown or unlinked code in a request body | 400 | `unknown_product_code` / `unknown_warehouse_code` |
 | Insufficient stock (detail names product, source, requested, available) | 400 | `insufficient_stock` |

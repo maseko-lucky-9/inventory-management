@@ -104,7 +104,7 @@ Correctness under concurrency lives in the database (ADR-003): a guarded `UPDATE
 - Never commit a red build or red unit tests; never bypass hooks (`--no-verify` is forbidden).
 - **Never squash.** A squash merge produces exactly the history the assignment forbids. The global push guard blocks direct pushes to `main`, so work on a `work` branch and merge with `gh pr merge --rebase` (or fast-forward) only.
 - Commits drafted with AI carry the footer `AI-assisted: <tool> — reviewed and explained`, and the README AI section lists them.
-- Pre-submit: `git log --format=%s` through the same regex prints nothing; `git log --merges` is empty.
+- Pre-submit: `git log --format=%s c677f05..HEAD` through the same regex prints nothing; `git log --merges` is empty. The audit starts after `c677f05` because two pre-clock documentation commits (`17073e0`, `c677f05`) predate the hooks, fail the subject rule, and are not rewritten; the README discloses them.
 
 ## Coding standards
 
@@ -125,6 +125,7 @@ Every non-2xx response is Problem Details with `code` and `traceId` (plus `error
 | 401 | `unauthorized`, `invalid_credentials` |
 | 404 | `product_not_found`, `warehouse_not_found` (unknown code in a path or query) |
 | 409 | `duplicate_product_code`, `duplicate_warehouse_code` |
+| 415 | `unsupported_media_type` (a body that is not JSON) |
 | 429 | `too_many_requests` (login only) |
 | 503 | `concurrency_conflict` (+ Retry-After), `database_unavailable` |
 | 500 | `internal_error`: no stack trace; a CHECK violation is logged as a defect |
