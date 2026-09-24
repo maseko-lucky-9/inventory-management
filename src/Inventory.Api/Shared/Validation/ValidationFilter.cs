@@ -1,0 +1,26 @@
+using System.Text.Json;
+using FluentValidation;
+using FluentValidation.Results;
+
+namespace Inventory.Api.Shared.Validation;
+
+/// <summary>Runs the request's validator before the handler; failures become 400 validation_failed (ADR-004).</summary>
+public sealed class ValidationFilter<T>(IValidator<T> validator) : IEndpointFilter
+{
+    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        // Single() throws if the filter is attached to an endpoint without a T: a wiring defect, not a client error.
+        T argument = context.Arguments.OfType<T>().Single();
+        ValidationResult result = await validator.ValidateAsync(argument, context.HttpContext.RequestAborted);
+        if (result.IsValid)
+        {
+            return await next(context);
+        }
+
+        // Keys match the JSON property names, so the UI can bind each message to its field.
+        Dictionary<string, string[]> errors = result.Errors
+            .GroupBy(failure => JsonNamingPolicy.CamelCase.ConvertName(failure.PropertyName))
+            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray());
+        return TypedResults.ValidationProblem(errors, extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+    }
+}

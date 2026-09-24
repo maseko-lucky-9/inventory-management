@@ -1,3 +1,5 @@
+using FluentValidation;
+using Inventory.Api.Features.Orders;
 using Inventory.Api.Features.Products;
 using Inventory.Api.Features.Stock;
 using Inventory.Api.Features.Warehouses;
@@ -33,6 +35,9 @@ builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddScoped<ProductStore>();
 builder.Services.AddScoped<WarehouseStore>();
 builder.Services.AddScoped<StockStore>();
+builder.Services.AddSingleton<IValidator<CreateTransferOrderRequest>, TransferOrderValidator>();
+builder.Services.AddScoped<ITransferStore, TransferStore>();
+builder.Services.AddScoped<TransferService>();
 
 WebApplication app = builder.Build();
 
@@ -42,5 +47,6 @@ app.MapHealthChecks("/health");
 app.MapProductsEndpoints();
 app.MapWarehousesEndpoints();
 app.MapStockEndpoints();
+app.MapOrdersEndpoints();
 
 app.Run();
