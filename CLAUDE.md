@@ -6,7 +6,7 @@ This file sets the rules for any AI assistant working in this repo. The rules co
 
 ## Status
 
-Pre-build. Only `CLAUDE.md`, `README.md`, `.env.example`, `docs/spec.md`, `docs/constitution.md` and `docs/decisions/` exist. **Do not scaffold, write code or run `git init` until the user says the clock has started.** Task T00 is the first thing on the clock.
+Built (Senior tier, T00–T22): API, UI, Compose and e2e spec in; `GET /orders` and pagination not built; README §11 lists what was left out and the known limits.
 
 ## Stack
 
@@ -104,7 +104,7 @@ Correctness under concurrency lives in the database (ADR-003): a guarded `UPDATE
 - Never commit a red build or red unit tests; never bypass hooks (`--no-verify` is forbidden).
 - **Never squash.** A squash merge produces exactly the history the assignment forbids. The global push guard blocks direct pushes to `main`, so work on a `work` branch and merge with `gh pr merge --rebase` (or fast-forward) only.
 - Commits drafted with AI carry the footer `AI-assisted: <tool> — reviewed and explained`, and the README AI section lists them.
-- Pre-submit: `git log --format=%s c677f05..HEAD` through the same regex prints nothing; `git log --merges` is empty. The audit starts after `c677f05` because two pre-clock documentation commits (`17073e0`, `c677f05`) predate the hooks, fail the subject rule, and are not rewritten; the README discloses them.
+- Pre-submit: `git log --format=%s 1c84ef2..HEAD` through the same regex prints nothing; `git log --merges` is empty. The audit starts after `1c84ef2` because four commits predate the hooks, fail the subject rule, and are not rewritten (owner's decision); the README discloses them: `17073e0`, `c677f05`, `ef726ab` (pre-clock docs, IDE-generated messages) and `1c84ef2` (Phase 1: A3 and T00–T03 as one commit with the out-of-list scope `config`).
 
 ## Coding standards
 
@@ -134,10 +134,10 @@ An unknown **or unlinked** warehouse code gets the same response as an unknown o
 
 ## Security
 
-- Authentication at the boundary; every route except `POST /auth/login` and `/health` requires a token.
+- Authentication at the boundary; every route except `POST /auth/login`, `/health` and (Development only) `/openapi/v1.json` requires a token.
 - Authorization inside store queries: every scoped query joins `user_warehouses` on the current user's id. The UI never enforces permissions.
 - Secrets come from the environment, never source. Real values live only in the local `.env`, which is gitignored (T00's `.gitignore` must list it). `.env.example` is committed with `<PLACEHOLDER>` values only; when a new setting is needed, add it there with a comment. **Never write a real password, key or token into any committed file.** The one exception is the assignment's own public `postgres` value from its §3.1 one-liner.
-- Demo users (alice → WH-A, bob → WH-B, carol → no links) are demo-only. `db/seed.sql` creates them with no password hash; `UserStore` hashes `DemoUsers__Password` from the environment at startup (ADR-008). If it's unset, they cannot log in and a warning is logged. The integration fixture sets its own random value per run.
+- Demo users (alice → WH-A, bob → WH-B, carol → no links) are demo-only. `db/seed.sql` creates them with no password hash; `DemoPasswordInitializer` hashes `DemoUsers__Password` from the environment at startup and stores it through `UserStore` (ADR-008). If it's unset, they cannot log in and a warning is logged. The integration fixture sets its own random value per run.
 
 ## Glossary (use these names exactly)
 

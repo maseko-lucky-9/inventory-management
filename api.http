@@ -1,0 +1,95 @@
+# The README section 5 walkthrough as ready-to-send requests (VS Code REST Client / JetBrains HTTP client).
+# Start the API first (README section 3). Replace <PLACEHOLDER> with the DemoUsers__Password you set in
+# your local .env. Never commit a real password here.
+
+@api = http://localhost:8080
+@password = <PLACEHOLDER>
+
+### Log in as alice (linked to WH-A). Expect 200 with accessToken.
+# @name login
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{"username":"alice","password":"{{password}}"}
+
+###
+@token = {{login.response.body.accessToken}}
+
+### Create a product. Expect 201 + Location: /products/SKU-1
+POST {{api}}/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"code":"SKU-1","description":"Demo product"}
+
+### Create it again. Expect 409 duplicate_product_code
+POST {{api}}/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"code":"SKU-1","description":"Demo product"}
+
+### List products. Expect 200
+GET {{api}}/products
+Authorization: Bearer {{token}}
+
+### Get one product. Expect 200
+GET {{api}}/products/SKU-1
+Authorization: Bearer {{token}}
+
+### Unknown product. Expect 404 product_not_found
+GET {{api}}/products/NO-SUCH-SKU
+Authorization: Bearer {{token}}
+
+### Create a warehouse (the creator is linked to it). Expect 201
+POST {{api}}/warehouses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"code":"WH-1","name":"Demo warehouse"}
+
+### List warehouses. Expect 200: WH-A and WH-1 only
+GET {{api}}/warehouses
+Authorization: Bearer {{token}}
+
+### Receive stock into a linked warehouse. Expect 200, quantity 10
+POST {{api}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"productCode":"SKU-1","warehouseCode":"WH-A","quantity":10}
+
+### Stock by product. Expect 200: linked warehouses only
+GET {{api}}/stock?productCode=SKU-1
+Authorization: Bearer {{token}}
+
+### Stock by warehouse. Expect 200
+GET {{api}}/stock?warehouseCode=WH-A
+Authorization: Bearer {{token}}
+
+### Transfer 7 from WH-A to WH-B (destination may be any existing warehouse). Expect 201
+POST {{api}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"productCode":"SKU-1","sourceWarehouseCode":"WH-A","destinationWarehouseCode":"WH-B","quantity":7}
+
+### The same transfer again. Expect 400 insufficient_stock: requested 7, available 3
+POST {{api}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"productCode":"SKU-1","sourceWarehouseCode":"WH-A","destinationWarehouseCode":"WH-B","quantity":7}
+
+### WH-B is not linked to alice, so it looks unknown. Expect 404 warehouse_not_found
+GET {{api}}/stock?warehouseCode=WH-B
+Authorization: Bearer {{token}}
+
+### No token. Expect 401 unauthorized
+GET {{api}}/products
+
+### Health. Expect 200
+GET {{api}}/health
+
+### OpenAPI document (Development only). Expect 200
+GET {{api}}/openapi/v1.json
