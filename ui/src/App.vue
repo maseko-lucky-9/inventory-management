@@ -7,6 +7,7 @@ import { RouterLink, RouterView } from 'vue-router'
     <RouterLink to="/products" class="brand">Inventory</RouterLink>
     <nav aria-label="Main">
       <RouterLink to="/products">Products</RouterLink>
+      <RouterLink to="/products/new">New product</RouterLink>
     </nav>
   </header>
   <main class="page">

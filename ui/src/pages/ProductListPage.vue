@@ -14,6 +14,7 @@ onMounted(load)
   <div>
     <div class="pl-bar">
       <h1 class="pl-heading">Products</h1>
+      <RouterLink to="/products/new" class="button">New product</RouterLink>
     </div>
 
     <!-- Loading state -->
@@ -29,7 +30,7 @@ onMounted(load)
 
     <!-- Empty state -->
     <p v-else-if="state.tag === 'empty'" class="pl-notice muted">
-      No products yet.
+      No products yet. <RouterLink to="/products/new">Create the first one.</RouterLink>
     </p>
 
     <!-- Error state -->
