@@ -166,6 +166,8 @@ The integration suite starts one PostgreSQL container per run and uses unique da
 
 Bodies are JSON with camelCase names exactly as the assignment spells them. Success bodies are the resource or a plain array, with no wrapper. Timestamps are ISO-8601 UTC. Unknown request fields are ignored. `POST /stock` is additive and returns 200 with the resulting level, because an increment creates no new addressable resource. Lists are not paginated (the assignment says "list all").
 
+**Login rate limit behind a proxy.** Login allows 10 attempts a minute per client address. Behind a reverse proxy every caller would share the proxy's address, and so one window. `X-Forwarded-For` is therefore honoured, but only on a connection from loopback or from a network listed in `ForwardedHeaders__KnownNetworks` (comma-separated CIDR, empty by default), and only its last hop is read, so a direct caller cannot choose its own window. A proxy in its own container or a cloud load balancer is not loopback: list its network there.
+
 ### Error contract
 
 Every non-2xx response is an RFC 9457 Problem Details document with `type`, `title`, `status`, `detail`, `instance`, a stable `code` and a `traceId`. Validation failures add `errors`, keyed by JSON property name. The `traceId` matches the server log line.

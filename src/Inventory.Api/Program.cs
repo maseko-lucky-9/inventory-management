@@ -64,6 +64,8 @@ builder.Services.AddScoped<TransferService>();
 
 WebApplication app = builder.Build();
 
+// First, so everything after it (the login rate limit above all) sees the client's address, not a trusted proxy's.
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 // After the status-code pages, so a bare 401 or 429 still gets its Problem Details body.
