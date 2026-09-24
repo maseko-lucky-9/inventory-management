@@ -1,6 +1,6 @@
 # ADR-002: Vertical slices in one API project
 
-- Status: Accepted
+- Status: Accepted. Amended by [ADR-008](008-sql-placement-and-inline-scope-join.md): no `Shared/Health/` (the health check lives in `Shared/Persistence/`), and the scope guard checks the inline join instead of a fragment
 - Date: 2026-09-24
 - Deciders: Thulani Maseko
 - Traces: B1, B4, B5, H5, H10, S4, A2, A4, I2, G16; constitution II and the "Layout" standard

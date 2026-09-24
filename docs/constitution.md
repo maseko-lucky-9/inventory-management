@@ -17,7 +17,7 @@ Invariants that must hold across concurrent requests live in the database: the n
 SCAD's own reading rule (H10) is the project's scope rule. No feature enters without its proving test. No abstraction enters without a second caller or a test that needs the seam. YAGNI is a scoring strategy here, not a style preference.
 
 ### III. SQL is hand-written, parameterised, and lives in one place
-Every SQL statement is a constant in a feature's Store file. Parameters are always named parameters, never string interpolation. Nothing outside a Store file contains SQL. This satisfies H3 and the house standard "no raw SQL in application code" at the same time: the store *is* the data layer.
+Every SQL statement is a constant in a feature's Store file. The one other place SQL may live is the database plumbing in `Shared/Persistence/`: the schema initializer and the health check (ADR-008). Parameters are always named parameters, never string interpolation. Nothing else contains SQL. This satisfies H3 and the house standard "no raw SQL in application code" at the same time: the store *is* the data layer.
 
 ### IV. Prove each behaviour at the lowest layer that can prove it
 Validation rules → unit tests on the validator. Outcome-to-error mapping → unit tests on the service with a fake store. Anything involving SQL, constraints, transactions, locking, routing, JSON, status codes or auth → integration tests through the real HTTP path against a real PostgreSQL (B6). A mocked test never stands in for an integration test.
@@ -40,7 +40,7 @@ An AI assistant may draft; the candidate reviews, understands and can defend eve
 |---|---|---|
 | Database | PostgreSQL only — `postgres:17-alpine` in Compose, in Testcontainers and in the README one-liner. No SQLite, SQL Server or in-memory provider anywhere, including tests | Package deny-list scan in `scripts/check-constraints.sh`, run by the pre-commit hook and the pre-submit gate |
 | Data access | Dapper over Npgsql (or raw ADO.NET). **Banned:** Entity Framework Core, NHibernate, ServiceStack OrmLite, and any SQL-generating helper — Dapper.Contrib, Dapper.SimpleCRUD, Dapper.FastCrud, SqlKata, linq2db, RepoDb | Same deny-list scan. Dapper is a *mapper* (rows → objects); it generates no SQL, which is the distinction to state at the interview |
-| Parameterised SQL | No interpolated, formatted or concatenated SQL. Named parameters only | SQL-hygiene unit test scans every Store source file for interpolation and concatenation next to SQL keywords, and every non-Store file for SQL keywords |
+| Parameterised SQL | No interpolated, formatted or concatenated SQL. Named parameters only | SQL-hygiene unit test scans every Store and `Shared/Persistence/` source file for interpolation and concatenation next to SQL keywords, and every other file for SQL keywords |
 | Schema shipped | `db/schema.sql` and `db/seed.sql` are the single source of truth; applied idempotently by the API at startup and by the integration suite against a fresh container | The integration suite passing on a fresh container is the proof; fresh-clone smoke test before submission |
 | Time box | Four hours. Drop order D1–D10 governs what is cut | Start/end recorded in README; tasks carry timeboxes |
 | Commit hygiene | Conventional Commits; one logical change per commit | `.githooks/commit-msg` regex; pre-submit history audit; no squash merges |
@@ -105,3 +105,4 @@ When two sources disagree, the higher one wins:
 | Version | Date | Change |
 |---|---|---|
 | 1.0.0 | 2026-09-24 | Ratified from the simplified spec, the author's rulings and the standards sources |
+| 1.1.0 | 2026-09-24 | Principle III: SQL may also live in the database plumbing in `Shared/Persistence/`, and scoped queries write the link join in full instead of sharing a fragment. Reason: a shared fragment breaks "never concatenated", and the schema lock and health check need SQL (ADR-008) |

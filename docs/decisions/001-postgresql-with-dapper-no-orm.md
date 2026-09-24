@@ -1,6 +1,6 @@
 # ADR-001: PostgreSQL with Dapper, no ORM
 
-- Status: Accepted
+- Status: Accepted. Amended by [ADR-008](008-sql-placement-and-inline-scope-join.md): SQL may also live in `Shared/Persistence/` (schema initializer, health check)
 - Date: 2026-09-24
 - Deciders: Thulani Maseko
 - Traces: H2, H3, T3, B4, B6, C1, C2, C3, A2, I5, G4, G16; constitution I, III, IV; FR-022

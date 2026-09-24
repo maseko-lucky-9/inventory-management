@@ -12,7 +12,7 @@ Each rule comes from the assignment. The trace IDs are from my spec: H = hard co
 |---|---|---|
 | PostgreSQL only: `postgres:17-alpine` in Compose, in Testcontainers and in the `docker run` one-liner. No SQLite, SQL Server or in-memory provider anywhere, tests included | H2, T3 | `scripts/check-constraints.sh` package deny-list (pre-commit hook and pre-submit gate); the integration suite runs on `postgres:17-alpine` |
 | No ORM and no SQL-generating helper. Dapper over Npgsql. Banned: EntityFrameworkCore, NHibernate, ServiceStack, OrmLite, Dapper.Contrib, Dapper.SimpleCRUD, Dapper.FastCrud, SqlKata, linq2db, RepoDb, and anything with Sqlite, SqlClient or InMemory | H3, G4 | The same deny-list scan |
-| Hand-written SQL with named parameters only. SQL lives only in `*Store` files | H3 | `SqlHygieneTests` (unit suite, every commit): Store files may not interpolate, format or concatenate SQL; no other file may contain SQL keywords |
+| Hand-written SQL with named parameters only. SQL lives only in `*Store` files and the database plumbing in `Shared/Persistence/` (ADR-008) | H3 | `SqlHygieneTests` (unit suite, every commit): Store and `Shared/Persistence/` files may not interpolate, format or concatenate SQL; no other file may contain SQL keywords |
 | Schema shipped in `db/schema.sql` and `db/seed.sql`, idempotent, applied by the API at startup | H4, G3 | Integration suite on a fresh container; a test applies the schema twice; fresh-clone smoke test |
 | Conventional Commits with a mandatory scope from a fixed list; subject at most 72 characters (regex below) | H6, G25 | `.githooks/commit-msg`; pre-submit history audit |
 | One logical change per commit: one task, one commit, one green suite. Never "wip", "final", a bare "fix", or one commit containing everything | H6 | Pre-commit hook blocks a red build or red unit tests; history audit |
@@ -251,19 +251,20 @@ The race walkthrough, lock ordering, the Dekker's algorithm evaluation and the r
 
 > **Authorization lives in the data layer.** Every query that reads warehouses or stock, and the transfer's source lookup, joins the caller's warehouse links inside the SQL, so data outside the caller's scope is never read. The UI is the wrong place to enforce this: it runs on the user's machine and is fully under their control — anyone can call the API directly with curl or Postman and skip the UI entirely, so a UI check only hides data, it does not protect it. Enforcing at the endpoint level would be better but is forgettable per route; putting the predicate in the store means a new endpoint that reuses the store inherits the rule. Row-level security in PostgreSQL would be the next layer of defence in depth.
 
-How it is scoped: `ICurrentUser` supplies only the user id. One shared link-join fragment on `user_warehouses` is applied inside every scoped query in `WarehouseStore`, `StockStore` and `TransferStore`. Products are a global catalogue. A transfer's source must be linked; its destination may be any existing warehouse. An unlinked warehouse gets the same response as an unknown one. Details: [ADR-006](docs/decisions/006-self-issued-jwt-and-relational-warehouse-scoping.md).
+How it is scoped: `ICurrentUser` supplies only the user id. Every scoped query in `WarehouseStore`, `StockStore` and `TransferStore` carries the same inner join on `user_warehouses`, written out in full; there is no shared fragment to concatenate. Products are a global catalogue. A transfer's source must be linked; its destination may be any existing warehouse. An unlinked warehouse gets the same response as an unknown one. Details: [ADR-006](docs/decisions/006-self-issued-jwt-and-relational-warehouse-scoping.md) and [ADR-008](docs/decisions/008-sql-placement-and-inline-scope-join.md).
 
 ## 9. Design decisions
 
 Each ADR records the context, the alternatives, the cost accepted, the proving tests and the trigger to revisit it. Its `Traces:` line cites requirements (FR-xxx) from the [specification](docs/spec.md) and principles (I–VIII) from the [constitution](docs/constitution.md).
 
-1. [ADR-001: PostgreSQL with Dapper, no ORM](docs/decisions/001-postgresql-with-dapper-no-orm.md). Hand-written, named-parameter SQL in Store files only; Dapper maps rows and generates no SQL.
+1. [ADR-001: PostgreSQL with Dapper, no ORM](docs/decisions/001-postgresql-with-dapper-no-orm.md). Hand-written, named-parameter SQL in Store files; Dapper maps rows and generates no SQL.
 2. [ADR-002: Vertical slices in one API project](docs/decisions/002-vertical-slices-in-one-api-project.md). Five feature slices plus `Shared/`; interfaces only for `ITransferStore` and `ICurrentUser`.
 3. [ADR-003: Guarded update for concurrent transfers](docs/decisions/003-guarded-update-for-concurrent-transfers.md). Guarded decrement, `CHECK (quantity >= 0)`, ascending warehouse-id lock order, one READ COMMITTED transaction.
 4. [ADR-004: Domain exceptions, Problem Details and FluentValidation](docs/decisions/004-domain-exceptions-problem-details-and-fluentvalidation.md). One handler, one envelope, `DbErrorTranslator` for database errors.
 5. [ADR-005: Schema applied idempotently at startup](docs/decisions/005-schema-applied-idempotently-at-startup.md). `SchemaInitializer` under an advisory lock; works with the one-liner, Compose and the tests.
 6. [ADR-006: Self-issued JWT and relational warehouse scoping](docs/decisions/006-self-issued-jwt-and-relational-warehouse-scoping.md). The API signs its own tokens; scope is a join on `user_warehouses` in every scoped query.
 7. [ADR-007: Vue and Vite UI with a dev proxy](docs/decisions/007-vue-vite-ui-with-dev-proxy.md). Vue 3 + Vite + TypeScript, explicit page states, same-origin proxy, no CORS.
+8. [ADR-008: SQL placement and the inline warehouse scope join](docs/decisions/008-sql-placement-and-inline-scope-join.md). The scope join written in full in every scoped query; plumbing SQL only in `Shared/Persistence/`; demo passwords set by `UserStore`.
 
 ## 10. Test catalogue
 
@@ -276,7 +277,7 @@ Each ADR records the context, the alternatives, the cost accepted, the proving t
 | Self-transfer is rejected by the validator | Unit | The rule and its message | HTTP wiring |
 | Unique violation becomes a duplicate-code error | Unit | Translator mapping (duplicate code) | That the constraint exists |
 | Store and endpoint sources contain no interpolated SQL | Unit (source scan) | H3 hygiene | Query correctness |
-| Every scoped store query references the scope fragment | Unit (source scan) | T13 predicate present in every scoped query | That the join is written correctly |
+| Every scoped store query carries the warehouse link join | Unit (reflection over `*Sql` constants) | T13 predicate present in every scoped query | That the join is written correctly |
 | Posting a product twice returns 201 then 409 naming the code | Integration | Constraint + translation + handler + status | Concurrency of duplicates |
 | Transfer moves stock and writes one order atomically | Integration | End-to-end transfer through HTTP | Contention behaviour |
 | A transfer that would overflow the destination returns 400 and leaves the source unchanged | Integration | Atomicity: the decrement happened, then rolled back | Other failure points |
@@ -298,7 +299,7 @@ Mutation checks. Each is run once during the build; a test that stays green agai
 | Replace the guard with a C# read, compare and unguarded write | Lock interleaving (a 201 where a refusal is expected) |
 | Lock the source row first instead of the lower warehouse id | Opposing directions (deadlocks surface as 503s) |
 | Interpolate a value into a throwaway store query | SQL hygiene source scan |
-| Remove the scope fragment from one scoped query | Scope guard source scan |
+| Remove the link join from one scoped query | Scope guard (reflection over `*Sql` constants) |
 
 ## 11. What I knowingly left out
 

@@ -1,6 +1,6 @@
 # ADR-006: Self-issued JWT and relational warehouse scoping
 
-- Status: Accepted
+- Status: Accepted. The scope-fragment clause (`ScopeSql`) is superseded by [ADR-008](008-sql-placement-and-inline-scope-join.md): the join is written in full in each scoped query
 - Date: 2026-09-24
 - Deciders: Thulani Maseko
 - Traces: T9, T10, T13, H9, I3, R6, G12, G21, G22, G30, G35, G36, G37, G38, G39, G40, G41, G42, G43, G44; FR-012, FR-013, FR-014, FR-021; constitution VI

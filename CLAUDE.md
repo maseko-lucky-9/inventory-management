@@ -59,12 +59,12 @@ scripts/check-constraints.sh          ORM / non-Postgres package deny-list
 src/Inventory.Api/
   Program.cs                          composition root only
   Features/{Auth,Products,Warehouses,Stock,Orders}/   Endpoints · Contracts · Validator · Service · Store
-  Shared/{Persistence,Errors,Auth,Validation,Health}/
+  Shared/{Persistence,Errors,Auth,Validation}/
 tests/Inventory.UnitTests/            validators, TransferService (fake store), DbErrorTranslator, source scans
 tests/Inventory.IntegrationTests/     Postgres fixture, HTTP tests, concurrency, authorization
 ui/                                   Vue 3 + Vite
 e2e/                                  Playwright spec
-docs/decisions/                       ADR-001 … ADR-007
+docs/decisions/                       ADR-001 … ADR-008
 docs/{spec,constitution}.md           requirements FR-001 … FR-023; principles I … VIII
 ```
 
@@ -89,7 +89,7 @@ docker compose up --build                      # T19; API + postgres:17-alpine
 |---|---|---|
 | H2 | PostgreSQL only, everywhere including tests. No SQLite, SQL Server or in-memory provider | `scripts/check-constraints.sh` (pre-commit + pre-submit) |
 | H3 | No ORM and no SQL-generating helper. Dapper or raw ADO.NET only. **Never add:** `EntityFrameworkCore`, `NHibernate`, `ServiceStack`/`OrmLite`, `Dapper.Contrib`, `Dapper.SimpleCRUD`, `Dapper.FastCrud`, `SqlKata`, `linq2db`, `RepoDb`, anything with `Sqlite`, `SqlClient` or `InMemory` | Same deny-list scan |
-| H3 | SQL is a constant in a feature's `*Store` file, with **named parameters only**. No interpolated, formatted or concatenated SQL. No SQL keywords in any other file | `SqlHygieneTests` (unit suite, every commit) |
+| H3 | SQL is a constant in a feature's `*Store` file, with **named parameters only**. The one other place SQL may live is the database plumbing in `Shared/Persistence/` (ADR-008). No interpolated, formatted or concatenated SQL. No SQL keywords in any other file. Scoped queries write the `user_warehouses` join in full; no shared fragment | `SqlHygieneTests` and `ScopeGuardTests` (unit suite, every commit) |
 | H4 | The database is creatable from the repo without asking: `db/schema.sql` + `db/seed.sql`, idempotent, applied by `SchemaInitializer` at startup under an advisory lock | Integration suite on a fresh container; fresh-clone smoke test |
 | H5 | Four-hour hard cap. Priority is drop order D1 → D10. **Cut line at 3:20:** if auth isn't green, drop the e2e spec, then Compose, and record the cuts in the README | README time log |
 | B6 | Integration tests hit a real PostgreSQL through the real HTTP pipeline. A mocked test never stands in for one | Test catalogue in README |
@@ -136,7 +136,7 @@ An unknown **or unlinked** warehouse code gets the same response as an unknown o
 - Authentication at the boundary; every route except `POST /auth/login` and `/health` requires a token.
 - Authorization inside store queries: every scoped query joins `user_warehouses` on the current user's id. The UI never enforces permissions.
 - Secrets come from the environment, never source. Real values live only in the local `.env`, which is gitignored (T00's `.gitignore` must list it). `.env.example` is committed with `<PLACEHOLDER>` values only; when a new setting is needed, add it there with a comment. **Never write a real password, key or token into any committed file.** The one exception is the assignment's own public `postgres` value from its §3.1 one-liner.
-- Demo users (alice → WH-A, bob → WH-B, carol → no links) are demo-only. `db/seed.sql` creates them with no password hash; `SchemaInitializer` hashes `DemoUsers__Password` from the environment at startup. If it's unset, they cannot log in and a warning is logged. The integration fixture sets its own random value per run.
+- Demo users (alice → WH-A, bob → WH-B, carol → no links) are demo-only. `db/seed.sql` creates them with no password hash; `UserStore` hashes `DemoUsers__Password` from the environment at startup (ADR-008). If it's unset, they cannot log in and a warning is logged. The integration fixture sets its own random value per run.
 
 ## Glossary (use these names exactly)
 
