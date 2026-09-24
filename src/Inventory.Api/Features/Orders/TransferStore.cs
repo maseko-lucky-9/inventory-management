@@ -60,7 +60,6 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
         }
     }
 
-    // Source first for now; touching the lower warehouse id first is task T10.
     private static async Task<TransferOutcome> MoveAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction, TransferCommand command, CancellationToken cancellationToken)
     {
@@ -73,21 +72,56 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
         }
 
         object rows = new { ids.ProductId, ids.SourceId, ids.DestinationId, command.Quantity };
-        int decremented = await connection.ExecuteAsync(new CommandDefinition(DecrementSql, rows, transaction, cancellationToken: cancellationToken));
-        if (decremented == 0)
-        {
-            // QuerySingle, not ExecuteScalar: a NULL must fail loudly, not quietly become 0.
-            return new TransferOutcome.Insufficient(await connection.QuerySingleAsync<int>(
-                new CommandDefinition(AvailableSql, rows, transaction, cancellationToken: cancellationToken)));
-        }
-
-        return await CreditAndRecordAsync(connection, transaction, command, rows, cancellationToken);
+        // Lower warehouse id first: one global lock order leaves no circular wait (Coffman), so opposing transfers cannot deadlock.
+        bool destinationFirst = ids.DestinationId < ids.SourceId;
+        TransferOutcome.Insufficient? refusal = destinationFirst
+            ? await CreditThenDebitAsync(connection, transaction, rows, cancellationToken)
+            : await DebitThenCreditAsync(connection, transaction, rows, cancellationToken);
+        return refusal ?? await RecordAsync(connection, transaction, command, rows, cancellationToken);
     }
 
-    private static async Task<TransferOutcome> CreditAndRecordAsync(
+    // A refused debit returns without committing, so ExecuteAsync's rollback also undoes the credit that ran first.
+    private static async Task<TransferOutcome.Insufficient?> CreditThenDebitAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, object rows, CancellationToken cancellationToken)
+    {
+        await CreditAsync(connection, transaction, rows, cancellationToken);
+        return await DebitAsync(connection, transaction, rows, cancellationToken);
+    }
+
+    private static async Task<TransferOutcome.Insufficient?> DebitThenCreditAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, object rows, CancellationToken cancellationToken)
+    {
+        TransferOutcome.Insufficient? refusal = await DebitAsync(connection, transaction, rows, cancellationToken);
+        if (refusal is null)
+        {
+            await CreditAsync(connection, transaction, rows, cancellationToken);
+        }
+
+        return refusal;
+    }
+
+    // Null when the guard matched; otherwise the refusal, carrying what is available now.
+    private static async Task<TransferOutcome.Insufficient?> DebitAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, object rows, CancellationToken cancellationToken)
+    {
+        int decremented = await connection.ExecuteAsync(new CommandDefinition(DecrementSql, rows, transaction, cancellationToken: cancellationToken));
+        if (decremented > 0)
+        {
+            return null;
+        }
+
+        // QuerySingle, not ExecuteScalar: a NULL must fail loudly, not quietly become 0.
+        return new TransferOutcome.Insufficient(await connection.QuerySingleAsync<int>(
+            new CommandDefinition(AvailableSql, rows, transaction, cancellationToken: cancellationToken)));
+    }
+
+    private static Task<int> CreditAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, object rows, CancellationToken cancellationToken) =>
+        connection.ExecuteAsync(new CommandDefinition(IncrementSql, rows, transaction, cancellationToken: cancellationToken));
+
+    private static async Task<TransferOutcome> RecordAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction, TransferCommand command, object rows, CancellationToken cancellationToken)
     {
-        await connection.ExecuteAsync(new CommandDefinition(IncrementSql, rows, transaction, cancellationToken: cancellationToken));
         InsertedOrder inserted = await connection.QuerySingleAsync<InsertedOrder>(
             new CommandDefinition(InsertOrderSql, rows, transaction, cancellationToken: cancellationToken));
         return new TransferOutcome.Completed(new TransferOrder(
