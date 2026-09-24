@@ -7,9 +7,16 @@ public static class StockEndpoints
 {
     public static IEndpointRouteBuilder MapStockEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/stock");
-        group.MapPost("/", ReceiveAsync).AddEndpointFilter<ValidationFilter<ReceiveStockRequest>>();
-        group.MapGet("/", ListAsync).AddEndpointFilter<ValidationFilter<StockQuery>>();
+        RouteGroupBuilder group = app.MapGroup("/stock").WithTags("Stock").ProducesProblem(StatusCodes.Status401Unauthorized);
+        group.MapPost("/", ReceiveAsync)
+            .WithSummary("Receive stock into a linked warehouse; returns the new level.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .AddEndpointFilter<ValidationFilter<ReceiveStockRequest>>();
+        group.MapGet("/", ListAsync)
+            .WithSummary("List stock levels in linked warehouses by product, warehouse or both.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .AddEndpointFilter<ValidationFilter<StockQuery>>();
         return app;
     }
 

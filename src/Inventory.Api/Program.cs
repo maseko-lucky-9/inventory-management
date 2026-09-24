@@ -6,6 +6,7 @@ using Inventory.Api.Features.Stock;
 using Inventory.Api.Features.Warehouses;
 using Inventory.Api.Shared.Auth;
 using Inventory.Api.Shared.Errors;
+using Inventory.Api.Shared.OpenApi;
 using Inventory.Api.Shared.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -37,7 +38,7 @@ builder.Services.AddHostedService<DemoPasswordInitializer>();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ErrorCodes.Complete);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
-builder.Services.AddOpenApi();
+builder.Services.AddApiDocumentation();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddTokenAuthentication();
 builder.Services.AddLoginRateLimit(builder.Configuration);
@@ -78,11 +79,7 @@ app.MapProductsEndpoints();
 app.MapWarehousesEndpoints();
 app.MapStockEndpoints();
 app.MapOrdersEndpoints();
-
-// The API description is a development aid; other environments serve only the API.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi().AllowAnonymous();
-}
+// A setting, not the environment, so Compose (Production) can turn it on for local use.
+app.MapApiDocumentation();
 
 app.Run();

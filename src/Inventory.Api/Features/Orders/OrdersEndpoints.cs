@@ -7,8 +7,12 @@ public static class OrdersEndpoints
 {
     public static IEndpointRouteBuilder MapOrdersEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/orders");
-        group.MapPost("/", CreateAsync).AddEndpointFilter<ValidationFilter<CreateTransferOrderRequest>>();
+        RouteGroupBuilder group = app.MapGroup("/orders").WithTags("Orders").ProducesProblem(StatusCodes.Status401Unauthorized);
+        group.MapPost("/", CreateAsync)
+            .WithSummary("Transfer stock from a linked warehouse to any warehouse, atomically.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
+            .AddEndpointFilter<ValidationFilter<CreateTransferOrderRequest>>();
         return app;
     }
 

@@ -25,6 +25,8 @@ services:
       ConnectionStrings__Inventory: Host=db;Port=5432;Database=postgres;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres}
       Jwt__SigningKey: ${Jwt__SigningKey:-}
       DemoUsers__Password: ${DemoUsers__Password:-}
+      # Added after the four-hour build: OPENAPI_ENABLED=true serves the Swagger UI at /swagger (local use only).
+      OpenApi__Enabled: ${OPENAPI_ENABLED:-false}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

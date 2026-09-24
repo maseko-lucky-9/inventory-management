@@ -7,9 +7,13 @@ public static class WarehousesEndpoints
 {
     public static IEndpointRouteBuilder MapWarehousesEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/warehouses");
-        group.MapGet("/", ListAsync);
-        group.MapPost("/", CreateAsync).AddEndpointFilter<ValidationFilter<CreateWarehouseRequest>>();
+        RouteGroupBuilder group = app.MapGroup("/warehouses").WithTags("Warehouses").ProducesProblem(StatusCodes.Status401Unauthorized);
+        group.MapGet("/", ListAsync).WithSummary("List the warehouses linked to the caller.");
+        group.MapPost("/", CreateAsync)
+            .WithSummary("Create a warehouse and link it to the caller.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .AddEndpointFilter<ValidationFilter<CreateWarehouseRequest>>();
         return app;
     }
 

@@ -27,7 +27,9 @@ namespace Inventory.IntegrationTests;
 public sealed partial class AuthTests(ApiFactory api)
 {
     // The only routes a caller may reach without a token, as "METHOD pattern".
-    private static readonly string[] AnonymousRoutes = ["GET /health", "GET /openapi/{documentName}.json", "POST /auth/login"];
+    // The API document and its Swagger UI exist only while OpenApi:Enabled is true, as it is in this Development fixture.
+    private static readonly string[] AnonymousRoutes =
+        ["GET /health", "GET /openapi/{documentName}.json", "GET swagger/{**path}", "POST /auth/login"];
 
     [Fact]
     public async Task DemoLoginReturnsAnHourLongBearerTokenForThatUserWhichOpensProtectedRoutes()

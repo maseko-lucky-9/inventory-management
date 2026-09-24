@@ -8,10 +8,14 @@ public static class ProductsEndpoints
 {
     public static IEndpointRouteBuilder MapProductsEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/products");
-        group.MapGet("/", ListAsync);
-        group.MapGet("/{code}", GetAsync);
-        group.MapPost("/", CreateAsync).AddEndpointFilter<ValidationFilter<CreateProductRequest>>();
+        RouteGroupBuilder group = app.MapGroup("/products").WithTags("Products").ProducesProblem(StatusCodes.Status401Unauthorized);
+        group.MapGet("/", ListAsync).WithSummary("List all products.");
+        group.MapGet("/{code}", GetAsync).WithSummary("Get one product by its code.").ProducesProblem(StatusCodes.Status404NotFound);
+        group.MapPost("/", CreateAsync)
+            .WithSummary("Create a product.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .AddEndpointFilter<ValidationFilter<CreateProductRequest>>();
         return app;
     }
 

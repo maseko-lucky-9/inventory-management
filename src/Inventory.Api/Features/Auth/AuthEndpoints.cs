@@ -8,8 +8,12 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        RouteGroupBuilder group = app.MapGroup("/auth");
+        RouteGroupBuilder group = app.MapGroup("/auth").WithTags("Auth");
         group.MapPost("/login", LoginAsync)
+            .WithSummary("Log in and receive a bearer token.")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .AllowAnonymous()
             .RequireRateLimiting(LoginRateLimit.Policy)
             .AddEndpointFilter<ValidationFilter<LoginRequest>>();

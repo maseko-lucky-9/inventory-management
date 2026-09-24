@@ -2,7 +2,7 @@
 
 > **A RESTful inventory API in .NET (C#) over PostgreSQL, with a small Vue UI: products, warehouses, stock levels and warehouse-to-warehouse transfers that never oversell under concurrency. Tier built: Senior.**
 
-> **Status: built, Senior tier.** All endpoints, the concurrency strategy, JWT authentication with warehouse scoping in the data layer, the Vue UI and Docker Compose are in. `dotnet test` passes 123 unit and 133 integration tests. What was not built is listed in [section 11](#11-what-i-knowingly-left-out); the time log is in [section 14](#14-time-log). This README was first drafted before the clock as design preparation and then corrected against the built code. The drafts and the build were AI-assisted (Claude Code), as disclosed in [section 13](#13-ai-usage).
+> **Status: built, Senior tier.** All endpoints, the concurrency strategy, JWT authentication with warehouse scoping in the data layer, the Vue UI and Docker Compose are in. `dotnet test` passes 123 unit and 154 integration tests (133 at the end of the four-hour build; the rest came with the additions made after it). What was not built is listed in [section 11](#11-what-i-knowingly-left-out); the time log is in [section 14](#14-time-log). This README was first drafted before the clock as design preparation and then corrected against the built code. The drafts and the build were AI-assisted (Claude Code), as disclosed in [section 13](#13-ai-usage).
 
 ## Constraints this repo follows
 
@@ -167,11 +167,13 @@ npx playwright install chromium
 npx playwright test
 ```
 
-The integration suite starts one PostgreSQL container per run and uses unique data per test, so there is no cleanup code. Last full run (`dotnet test`, 2026-09-24 20:46): `Passed! - Failed: 0, Passed: 123` (unit, 271 ms) and `Passed! - Failed: 0, Passed: 133` (integration, 9 s). The catalogue is in [section 10](#10-test-catalogue).
+The integration suite starts one PostgreSQL container per run and uses unique data per test, so there is no cleanup code. Last full run (`dotnet test`, 2026-09-24 20:46): `Passed! - Failed: 0, Passed: 123` (unit, 271 ms) and `Passed! - Failed: 0, Passed: 133` (integration, 9 s). After the post-build additions: `Passed! - Failed: 0, Passed: 154` (integration). The catalogue is in [section 10](#10-test-catalogue).
 
 ## 5. Example calls
 
 `api.http` at the repo root holds the same sequence as ready-to-send requests. The built-in OpenAPI document is served in Development only, without a token, at `/openapi/v1.json`. Other environments do not serve it (`OpenApiTests`).
+
+**Swagger UI (added after the four-hour build).** One setting, `OpenApi:Enabled`, now serves both the document and a Swagger UI at `/swagger`, without a token. It is on by default under `dotnet run` in Development (`appsettings.Development.json`) and off everywhere else. For Compose, set `OPENAPI_ENABLED=true` in `.env` and run `docker compose up -d`; keep it off in production. To call the API from the UI: open `POST /auth/login`, choose *Try it out*, send `{"username":"alice","password":"<your DemoUsers__Password>"}` and copy `accessToken`; choose *Authorize*, paste the token (no `Bearer` prefix), then *Try it out* on any other operation. The document declares a `Bearer` JWT scheme required by every operation except login, a tag per feature, a summary per endpoint and each error status from the table below. The UI is the `Swashbuckle.AspNetCore.SwaggerUI` 10.2.3 package only; `Microsoft.AspNetCore.OpenApi` still generates the document. Proved by `SwaggerUiTests` and the added `OpenApiTests` cases.
 
 ### API surface
 
@@ -309,7 +311,7 @@ Each ADR records the context, the alternatives, the cost accepted, the proving t
 
 ## 10. Test catalogue
 
-Test names state their claim. Counts are test cases as `dotnet test --list-tests` lists them (a theory counts once per case): **123 unit, 133 integration, 1 end-to-end spec**. All passed in the last run (section 4).
+Test names state their claim. Counts are test cases as `dotnet test --list-tests` lists them (a theory counts once per case): **123 unit, 154 integration (133 at the four-hour mark), 1 end-to-end spec**. All passed in the last run (section 4).
 
 Unit tests (`tests/Inventory.UnitTests`, no Docker, run by the pre-commit hook):
 
@@ -346,7 +348,8 @@ Integration tests (`tests/Inventory.IntegrationTests`: `WebApplicationFactory<Pr
 | `MalformedRequestTests` | 19 | Malformed JSON, wrong types and empty bodies answer 400 `malformed_request`; non-JSON bodies answer 415; the same problem in every environment; every refusal carries `code` and `traceId` | — |
 | `ErrorEnvelopeTests` | 1 | An unknown route answers Problem Details with `code` and `traceId` | Other framework-generated statuses beyond the sweep |
 | `EndpointCoverageTests` | 17 | Every endpoint answers 503 `database_unavailable` when the database is unreachable; health answers 503; a padded product code is a duplicate; unknown body fields are ignored and never echoed | — |
-| `OpenApiTests` | 3 | `/openapi/v1.json` is served in Development with the contract's names, and not served outside it | Document completeness |
+| `OpenApiTests` | 15 | `/openapi/v1.json` uses the contract's names, declares the Bearer scheme on every operation except login, tags and summarises each operation, documents each route's problem statuses, and is not served when disabled | That the documented statuses are the only ones the code can return |
+| `SwaggerUiTests` (added after the build) | 9 | The Swagger UI and document answer without a token when `OpenApi:Enabled` is on, read the built-in document, and answer 404 (signed in) or 401 (anonymous) when off, in any environment | How the UI renders |
 | `AuthTests` | 20 | Demo login returns an hour-long bearer token that opens protected routes; wrong password and unknown user get the same 401; tampered, expired and wrong-algorithm tokens are rejected; every route except login, health and the API document answers 401 without a token; signing-key and demo-password startup rules; 429 on the login limit | Token revocation (not built) |
 | `LoginRateLimitTests` | 5 | Clients behind a loopback proxy each get their own login window; a forwarded header from an untrusted address does not escape the window; a proxy in a configured network is trusted; a mistyped network stops startup | Distributed rate limiting |
 | `ScopingTests` | 10 | The warehouse list shows only linked warehouses; an unlinked warehouse answers exactly as an unknown one for queries, receipts and transfer sources; a transfer into an unlinked destination completes; the creator is auto-linked; carol sees nothing and can still create a product; the order records its creator | UI rendering |
