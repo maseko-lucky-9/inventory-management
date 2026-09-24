@@ -337,6 +337,7 @@ Specification questions sent to SCAD on 2026-09-24. Until an answer arrives, the
 | 4 | Are product and warehouse codes case-sensitive? | Yes, stored as entered after trimming | Pending |
 | 5 | Are update and delete for products and warehouses expected (§2 "CRUD"), or is §4 the full surface? | §4 is the surface; update/delete listed under "left out" | Pending |
 | 6 | Should Docker Compose run only the API and the database, or the UI as well? | API + database | Pending |
+| 7 | Expected volume: total and daily active users, read-to-write ratio, data size (products, warehouses, transfers per day)? Decides read-heavy vs write-heavy | ~100 daily users; 50 warehouses; 10,000 products; 1,000 transfers/day; peak 20 reads/s and 2 writes/s (≈10:1, read-heavy); under 100 MB in year one `[ASSUMED]` | Pending |
 
 Other assumptions:
 
