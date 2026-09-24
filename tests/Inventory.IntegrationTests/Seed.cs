@@ -48,6 +48,12 @@ public static class Seed
             new { productCode });
     }
 
+    public static async Task<long> UserIdAsync(ApiFactory api, string username)
+    {
+        await using NpgsqlConnection connection = Open(api);
+        return await connection.ExecuteScalarAsync<long>("SELECT id FROM users WHERE username = @username", new { username });
+    }
+
     private static async Task ExecuteAsync(ApiFactory api, string sql, object parameters)
     {
         await using NpgsqlConnection connection = Open(api);

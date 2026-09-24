@@ -73,6 +73,7 @@ public sealed class EndpointCoverageTests(ApiFactory api)
     [InlineData("POST", "/stock", """{"productCode":"SKU-OFFLINE","warehouseCode":"WH-OFFLINE","quantity":5}""")]
     [InlineData("GET", "/stock?productCode=SKU-OFFLINE", null)]
     [InlineData("POST", "/orders", """{"productCode":"SKU-OFFLINE","sourceWarehouseCode":"WH-A","destinationWarehouseCode":"WH-B","quantity":1}""")]
+    [InlineData("POST", "/auth/login", """{"username":"alice","password":"offline"}""")]
     public async Task EveryEndpointAnswers503DatabaseUnavailableWhenTheDatabaseIsUnreachable(string method, string path, string? json)
     {
         await using WebApplicationFactory<Program> offline = api.WithUnreachableDatabase();

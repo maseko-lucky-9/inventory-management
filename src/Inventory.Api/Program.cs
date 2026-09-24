@@ -1,10 +1,14 @@
 using FluentValidation;
+using Inventory.Api.Features.Auth;
 using Inventory.Api.Features.Orders;
 using Inventory.Api.Features.Products;
 using Inventory.Api.Features.Stock;
 using Inventory.Api.Features.Warehouses;
+using Inventory.Api.Shared.Auth;
 using Inventory.Api.Shared.Errors;
 using Inventory.Api.Shared.Persistence;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Npgsql;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -28,10 +32,22 @@ builder.Services.AddSingleton(services => NpgsqlDataSource.Create(new NpgsqlConn
     Options = "-c statement_timeout=5000",
 }.ConnectionString));
 builder.Services.AddHostedService<SchemaInitializer>();
+// After SchemaInitializer: the demo users must exist before their passwords are set.
+builder.Services.AddHostedService<DemoPasswordInitializer>();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ErrorCodes.Complete);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddTokenAuthentication();
+builder.Services.AddLoginRateLimit(builder.Configuration);
+builder.Services.AddSingleton<JsonWebTokenHandler>();
+builder.Services.AddSingleton<TokenIssuer>();
+builder.Services.AddSingleton<PasswordHasher<User>>();
+builder.Services.AddSingleton<PasswordVerifier>();
+// Singleton, unlike the scoped stores: it holds only the data source, and the startup password step needs it.
+builder.Services.AddSingleton<UserStore>();
+builder.Services.AddSingleton<IValidator<LoginRequest>, LoginValidator>();
 builder.Services.AddScoped<ProductStore>();
 builder.Services.AddScoped<WarehouseStore>();
 builder.Services.AddScoped<StockStore>();
@@ -47,7 +63,12 @@ WebApplication app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.MapHealthChecks("/health");
+// After the status-code pages, so a bare 401 or 429 still gets its Problem Details body.
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
+app.MapHealthChecks("/health").AllowAnonymous();
+app.MapAuthEndpoints();
 app.MapProductsEndpoints();
 app.MapWarehousesEndpoints();
 app.MapStockEndpoints();
@@ -56,7 +77,7 @@ app.MapOrdersEndpoints();
 // The API description is a development aid; other environments serve only the API.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
 app.Run();
