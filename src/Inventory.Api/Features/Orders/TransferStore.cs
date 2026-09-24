@@ -1,19 +1,25 @@
 using Dapper;
+using Inventory.Api.Shared.Auth;
 using Inventory.Api.Shared.Errors;
 using Npgsql;
 
 namespace Inventory.Api.Features.Orders;
 
 /// <summary>One transfer in one READ COMMITTED transaction; the guarded UPDATE decides (ADR-003).</summary>
-public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
+/// <remarks>Scoped at the source only (ADR-006, G36): the caller must be linked to it; the destination may be any existing warehouse.</remarks>
+public sealed class TransferStore(NpgsqlDataSource dataSource, ICurrentUser currentUser) : ITransferStore
 {
     // A literal: SET takes no parameters. Waiting longer than this becomes 503 concurrency_conflict.
     private const string LockTimeoutSql = "SET LOCAL lock_timeout = '3s'";
 
+    // An unlinked source resolves to no id, exactly like an unknown one (FR-014). The destination is deliberately unscoped.
+    // Every later statement works on these ids, so the source scope applied here carries through the transaction.
     private const string ResolveSql = """
         SELECT
             (SELECT id FROM products WHERE code = @ProductCode) AS ProductId,
-            (SELECT id FROM warehouses WHERE code = @SourceWarehouseCode) AS SourceId,
+            (SELECT w.id FROM warehouses w
+             JOIN user_warehouses uw ON uw.warehouse_id = w.id AND uw.user_id = @UserId
+             WHERE w.code = @SourceWarehouseCode) AS SourceId,
             (SELECT id FROM warehouses WHERE code = @DestinationWarehouseCode) AS DestinationId
         """;
 
@@ -34,9 +40,10 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
         ON CONFLICT (product_id, warehouse_id) DO UPDATE SET quantity = stock.quantity + EXCLUDED.quantity, updated_at = now()
         """;
 
+    // created_by is the caller, so every order says who moved the stock.
     private const string InsertOrderSql = """
         INSERT INTO transfer_orders (product_id, source_warehouse_id, destination_warehouse_id, quantity, created_by)
-        VALUES (@ProductId, @SourceId, @DestinationId, @Quantity, NULL)
+        VALUES (@ProductId, @SourceId, @DestinationId, @Quantity, @UserId)
         RETURNING id AS Id, created_at AS CreatedAt
         """;
 
@@ -47,7 +54,7 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
             await using NpgsqlConnection connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
             await connection.ExecuteAsync(new CommandDefinition(LockTimeoutSql, transaction: transaction, cancellationToken: cancellationToken));
-            TransferOutcome outcome = await MoveAsync(connection, transaction, command, cancellationToken);
+            TransferOutcome outcome = await MoveAsync(connection, transaction, command, currentUser.UserId, cancellationToken);
             // Only a completed transfer commits; every refusal undoes whatever ran before it.
             await (outcome is TransferOutcome.Completed
                 ? transaction.CommitAsync(cancellationToken)
@@ -61,9 +68,9 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
     }
 
     private static async Task<TransferOutcome> MoveAsync(
-        NpgsqlConnection connection, NpgsqlTransaction transaction, TransferCommand command, CancellationToken cancellationToken)
+        NpgsqlConnection connection, NpgsqlTransaction transaction, TransferCommand command, long userId, CancellationToken cancellationToken)
     {
-        object codes = new { command.ProductCode, command.SourceWarehouseCode, command.DestinationWarehouseCode };
+        object codes = new { command.ProductCode, command.SourceWarehouseCode, command.DestinationWarehouseCode, UserId = userId };
         ResolvedIds ids = await connection.QuerySingleAsync<ResolvedIds>(
             new CommandDefinition(ResolveSql, codes, transaction, cancellationToken: cancellationToken));
         if (FindUnknown(ids, command) is { } unknown)
@@ -71,7 +78,7 @@ public sealed class TransferStore(NpgsqlDataSource dataSource) : ITransferStore
             return unknown;
         }
 
-        object rows = new { ids.ProductId, ids.SourceId, ids.DestinationId, command.Quantity };
+        object rows = new { ids.ProductId, ids.SourceId, ids.DestinationId, command.Quantity, UserId = userId };
         // Lower warehouse id first: one global lock order leaves no circular wait (Coffman), so opposing transfers cannot deadlock.
         bool destinationFirst = ids.DestinationId < ids.SourceId;
         TransferOutcome.Insufficient? refusal = destinationFirst

@@ -51,11 +51,14 @@ public sealed class WarehouseTests(ApiFactory api)
         Assert.Contains(code, problem.Detail, StringComparison.Ordinal);
     }
 
+    // The list is scoped (ScopingTests): the fixture user sees what it created and what it is linked to, never demo WH-A.
     [Fact]
-    public async Task ListContainsTheCreatedWarehouseAndTheSeededOne()
+    public async Task ListContainsTheCreatedWarehouseAndALinkedSeededOne()
     {
         using HttpClient client = api.CreateClient();
         string code = TestData.Unique("WH");
+        string seeded = TestData.Unique("WH");
+        await Seed.WarehouseAsync(api, seeded);
         await client.PostAsJsonAsync("/warehouses", new { code, name = "Listed" });
 
         HttpResponseMessage response = await client.GetAsync("/warehouses");
@@ -63,7 +66,7 @@ public sealed class WarehouseTests(ApiFactory api)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonElement[] warehouses = await ReadListAsync(response);
         Assert.Contains(warehouses, warehouse => Is(warehouse, code, "Listed"));
-        Assert.Contains(warehouses, warehouse => Is(warehouse, "WH-A", "Warehouse A"));
+        Assert.Contains(warehouses, warehouse => Is(warehouse, seeded, seeded));
     }
 
     [Fact]

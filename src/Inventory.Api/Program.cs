@@ -48,6 +48,9 @@ builder.Services.AddSingleton<PasswordVerifier>();
 // Singleton, unlike the scoped stores: it holds only the data source, and the startup password step needs it.
 builder.Services.AddSingleton<UserStore>();
 builder.Services.AddSingleton<IValidator<LoginRequest>, LoginValidator>();
+// Scoped, like the stores that read it: one caller per request (ADR-006).
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddScoped<ProductStore>();
 builder.Services.AddScoped<WarehouseStore>();
 builder.Services.AddScoped<StockStore>();

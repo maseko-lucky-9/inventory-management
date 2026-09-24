@@ -9,12 +9,45 @@ public static class Seed
     public static Task ProductAsync(ApiFactory api, string code) => ExecuteAsync(api,
         "INSERT INTO products (code, description) VALUES (@code, @code)", new { code });
 
-    /// <summary>Returns the new id; ids ascend in creation order, which the lock-order tests rely on.</summary>
+    /// <summary>
+    /// Returns the new id; ids ascend in creation order, which the lock-order tests rely on.
+    /// The fixture user is linked to it, as the creator of a warehouse is, so default clients can use it.
+    /// </summary>
     public static async Task<long> WarehouseAsync(ApiFactory api, string code)
     {
         await using NpgsqlConnection connection = Open(api);
-        return await connection.ExecuteScalarAsync<long>(
+        long id = await connection.ExecuteScalarAsync<long>(
             "INSERT INTO warehouses (code, name) VALUES (@code, @code) RETURNING id", new { code });
+        await LinkAsync(api, ApiFactory.FixtureUsername, code);
+        return id;
+    }
+
+    /// <summary>Links a user to an existing warehouse, creating the user's row if it is missing. Fails loudly if the warehouse is missing.</summary>
+    public static async Task LinkAsync(ApiFactory api, string username, string warehouseCode)
+    {
+        await using NpgsqlConnection connection = Open(api);
+        int linked = await connection.ExecuteAsync(
+            """
+            WITH u AS (
+                INSERT INTO users (username) VALUES (@username)
+                ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+                RETURNING id)
+            INSERT INTO user_warehouses (user_id, warehouse_id)
+            SELECT u.id, w.id FROM u JOIN warehouses w ON w.code = @warehouseCode
+            """,
+            new { username, warehouseCode });
+        if (linked != 1)
+        {
+            throw new InvalidOperationException("No warehouse " + warehouseCode + " to link " + username + " to.");
+        }
+    }
+
+    /// <summary>The user id recorded on a transfer order, or null when none was recorded.</summary>
+    public static async Task<long?> OrderCreatorAsync(ApiFactory api, long orderId)
+    {
+        await using NpgsqlConnection connection = Open(api);
+        return await connection.QuerySingleAsync<long?>(
+            "SELECT created_by FROM transfer_orders WHERE id = @orderId", new { orderId });
     }
 
     /// <summary>Sets (not adds) the level of one product in one warehouse.</summary>
