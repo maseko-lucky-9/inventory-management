@@ -2,13 +2,14 @@
 import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { postJson, ApiError } from '../api/client'
+import { draftCode, draftDescription, clearDraft } from '../api/draftProduct'
 import type { Product } from '../api/types'
 
 const router = useRouter()
 
-// Form field values
-const code = ref('')
-const description = ref('')
+// Draft lives in a shared module so it survives a 401 -> login -> back round trip (US5).
+const code = draftCode
+const description = draftDescription
 
 // Submission state
 const submitting = ref(false)
@@ -43,11 +44,17 @@ async function submit() {
       code: code.value,
       description: description.value,
     })
+    // Clear the shared draft only after a confirmed successful create.
+    clearDraft()
     // Navigate to the new product's detail page on success
     await router.push(`/products/${encodeURIComponent(product.code)}`)
   } catch (err) {
     if (err instanceof ApiError) {
-      if (err.status === 400 && err.code === 'validation_failed') {
+      if (err.status === 401) {
+        // client.ts cleared the token and queued a /login redirect; draft is preserved in
+        // the shared module — do nothing else here.
+        return
+      } else if (err.status === 400 && err.code === 'validation_failed') {
         // Map field-level errors from the API's errors object
         const knownFields: ReadonlyArray<string> = ['code', 'description']
         const fieldMap: Record<string, string[]> = {}

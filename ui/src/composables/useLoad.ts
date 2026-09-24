@@ -37,6 +37,9 @@ export function useLoad<T>(
       state.value = checkEmpty ? { tag: 'empty' } : { tag: 'data', value: result }
     } catch (e) {
       if (myId !== callId) return // stale rejection superseded by a later load
+      // 401: client.ts already cleared the token and queued a /login redirect; stay loading
+      // so the page never flashes an error before the navigation completes.
+      if (e instanceof ApiError && e.status === 401) return
       if (e instanceof ApiError && options?.notFoundCodes?.includes(e.code)) {
         state.value = { tag: 'not-found' }
       } else {
