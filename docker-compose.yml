@@ -1,0 +1,36 @@
+# API + PostgreSQL. Values come from the environment or a local .env (see .env.example).
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    # TCP, not the socket: during initdb the temporary server listens on the socket only,
+    # so the check stays red until the real server is up.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # No published port: only the API reaches the database, over the Compose network.
+
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Inventory: Host=db;Port=5432;Database=postgres;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres}
+      Jwt__SigningKey: ${Jwt__SigningKey:-}
+      DemoUsers__Password: ${DemoUsers__Password:-}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure:3
+
+volumes:
+  pgdata:
