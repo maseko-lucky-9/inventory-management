@@ -1,3 +1,4 @@
+using Inventory.Api.Shared.Validation;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Inventory.Api.Features.Warehouses;
@@ -8,7 +9,7 @@ public static class WarehousesEndpoints
     {
         RouteGroupBuilder group = app.MapGroup("/warehouses");
         group.MapGet("/", ListAsync);
-        group.MapPost("/", CreateAsync);
+        group.MapPost("/", CreateAsync).AddEndpointFilter<ValidationFilter<CreateWarehouseRequest>>();
         return app;
     }
 
@@ -16,10 +17,11 @@ public static class WarehousesEndpoints
         TypedResults.Ok(await store.ListAsync(cancellationToken));
 
     // There is no GET /warehouses/{code}, so the 201 carries no Location header.
+    // The validator has run, so both fields are present.
     private static async Task<Created<Warehouse>> CreateAsync(
         CreateWarehouseRequest request, WarehouseStore store, CancellationToken cancellationToken)
     {
-        Warehouse warehouse = await store.CreateAsync(request.Code.Trim(), request.Name, cancellationToken);
+        Warehouse warehouse = await store.CreateAsync(request.Code!.Trim(), request.Name!, cancellationToken);
         return TypedResults.Created((string?)null, warehouse);
     }
 }

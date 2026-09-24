@@ -28,13 +28,17 @@ builder.Services.AddSingleton(services => NpgsqlDataSource.Create(new NpgsqlConn
     Options = "-c statement_timeout=5000",
 }.ConnectionString));
 builder.Services.AddHostedService<SchemaInitializer>();
-builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
-    context.ProblemDetails.Extensions.TryAdd("code", ErrorCodes.ForStatus(context.ProblemDetails.Status)));
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ErrorCodes.Complete);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
+builder.Services.AddOpenApi();
 builder.Services.AddScoped<ProductStore>();
 builder.Services.AddScoped<WarehouseStore>();
 builder.Services.AddScoped<StockStore>();
+builder.Services.AddSingleton<IValidator<CreateProductRequest>, CreateProductValidator>();
+builder.Services.AddSingleton<IValidator<CreateWarehouseRequest>, CreateWarehouseValidator>();
+builder.Services.AddSingleton<IValidator<ReceiveStockRequest>, ReceiveStockValidator>();
+builder.Services.AddSingleton<IValidator<StockQuery>, StockQueryValidator>();
 builder.Services.AddSingleton<IValidator<CreateTransferOrderRequest>, TransferOrderValidator>();
 builder.Services.AddScoped<ITransferStore, TransferStore>();
 builder.Services.AddScoped<TransferService>();
@@ -48,5 +52,11 @@ app.MapProductsEndpoints();
 app.MapWarehousesEndpoints();
 app.MapStockEndpoints();
 app.MapOrdersEndpoints();
+
+// The API description is a development aid; other environments serve only the API.
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
 
 app.Run();

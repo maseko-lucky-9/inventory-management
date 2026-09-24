@@ -34,8 +34,8 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
     {
         DomainException domain => (domain.Status, domain.Code, domain.Message),
         BadHttpRequestException { StatusCode: StatusCodes.Status415UnsupportedMediaType } =>
-            (StatusCodes.Status415UnsupportedMediaType, "unsupported_media_type", "The request body must be JSON."),
-        BadHttpRequestException bad => (bad.StatusCode, "malformed_request", "The request body could not be read."),
-        _ => (StatusCodes.Status500InternalServerError, "internal_error", "An unexpected error occurred."),
+            (StatusCodes.Status415UnsupportedMediaType, "unsupported_media_type", ErrorCodes.UnsupportedMediaTypeDetail),
+        BadHttpRequestException bad => (bad.StatusCode, "malformed_request", ErrorCodes.MalformedRequestDetail),
+        _ => (StatusCodes.Status500InternalServerError, "internal_error", ErrorCodes.InternalErrorDetail),
     };
 }

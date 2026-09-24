@@ -11,7 +11,9 @@ public sealed record Problem(string Code, string Detail, JsonElement Body)
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement body = document.RootElement.Clone();
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
-        string detail = body.TryGetProperty("detail", out JsonElement value) ? value.GetString() ?? "" : "";
+        string detail = body.GetProperty("detail").GetString() ?? "";
+        Assert.NotEqual("", detail.Trim());
+        Assert.Equal(response.RequestMessage?.RequestUri?.AbsolutePath, body.GetProperty("instance").GetString());
         return new Problem(body.GetProperty("code").GetString() ?? "", detail, body);
     }
 }

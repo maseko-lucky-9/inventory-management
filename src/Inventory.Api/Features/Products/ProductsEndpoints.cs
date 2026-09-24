@@ -1,4 +1,5 @@
 using Inventory.Api.Shared.Errors;
+using Inventory.Api.Shared.Validation;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Inventory.Api.Features.Products;
@@ -10,7 +11,7 @@ public static class ProductsEndpoints
         RouteGroupBuilder group = app.MapGroup("/products");
         group.MapGet("/", ListAsync);
         group.MapGet("/{code}", GetAsync);
-        group.MapPost("/", CreateAsync);
+        group.MapPost("/", CreateAsync).AddEndpointFilter<ValidationFilter<CreateProductRequest>>();
         return app;
     }
 
@@ -24,11 +25,11 @@ public static class ProductsEndpoints
         return TypedResults.Ok(product);
     }
 
+    // The validator has run, so both fields are present and the code holds only URL-safe characters.
     private static async Task<Created<Product>> CreateAsync(
         CreateProductRequest request, ProductStore store, CancellationToken cancellationToken)
     {
-        Product product = await store.CreateAsync(request.Code.Trim(), request.Description, cancellationToken);
-        // Escaped because codes are unvalidated until T09 and could hold URL-reserved characters.
-        return TypedResults.Created("/products/" + Uri.EscapeDataString(product.Code), product);
+        Product product = await store.CreateAsync(request.Code!.Trim(), request.Description!, cancellationToken);
+        return TypedResults.Created("/products/" + product.Code, product);
     }
 }

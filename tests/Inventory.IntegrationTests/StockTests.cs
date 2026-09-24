@@ -23,6 +23,31 @@ public sealed class StockTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task ReceivingTrimsBothCodesBeforeStoringTheLevel()
+    {
+        (string product, string warehouse) = await ProductInWarehouseAsync();
+        using HttpClient client = api.CreateClient();
+
+        HttpResponseMessage response = await ReceiveAsync(client, "  " + product + "  ", "\t" + warehouse + " ", 5);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal((product, warehouse, 5), Level(await response.Content.ReadFromJsonAsync<JsonElement>()));
+        Assert.Equal(5, await Seed.QuantityAsync(api, product, warehouse));
+    }
+
+    [Fact]
+    public async Task QueryTrimsBothFiltersBeforeLookingUpTheLevel()
+    {
+        (string product, string warehouse) = await ProductInWarehouseAsync();
+        await Seed.StockAsync(api, product, warehouse, 4);
+        using HttpClient client = api.CreateClient();
+
+        HttpResponseMessage response = await client.GetAsync($"/stock?productCode=%20{product}%20&warehouseCode=%09{warehouse}%20");
+
+        Assert.Equal([(product, warehouse, 4)], await LevelsAsync(response));
+    }
+
+    [Fact]
     public async Task QueryByProductReturnsOnlyItsRowsInEveryWarehouseOrderedByWarehouseCode()
     {
         string product = await ProductAsync();

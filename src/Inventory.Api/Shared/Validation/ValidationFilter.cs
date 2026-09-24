@@ -7,6 +7,9 @@ namespace Inventory.Api.Shared.Validation;
 /// <summary>Runs the request's validator before the handler; failures become 400 validation_failed (ADR-004).</summary>
 public sealed class ValidationFilter<T>(IValidator<T> validator) : IEndpointFilter
 {
+    // Set here: the fallback detail for a 400 describes an unreadable body, which this is not.
+    private const string Detail = "One or more fields are invalid.";
+
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         // Single() throws if the filter is attached to an endpoint without a T: a wiring defect, not a client error.
@@ -21,6 +24,7 @@ public sealed class ValidationFilter<T>(IValidator<T> validator) : IEndpointFilt
         Dictionary<string, string[]> errors = result.Errors
             .GroupBy(failure => JsonNamingPolicy.CamelCase.ConvertName(failure.PropertyName))
             .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray());
-        return TypedResults.ValidationProblem(errors, extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
+        return TypedResults.ValidationProblem(
+            errors, detail: Detail, extensions: new Dictionary<string, object?> { ["code"] = "validation_failed" });
     }
 }
