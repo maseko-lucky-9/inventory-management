@@ -1,4 +1,4 @@
-# API + PostgreSQL. Values come from the environment or a local .env (see .env.example).
+# UI + API + PostgreSQL. Values come from the environment or a local .env (see .env.example).
 services:
   db:
     image: postgres:17-alpine
@@ -34,6 +34,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: on-failure:3
+
+  # Added after the four-hour build: the Vue UI, built and served by nginx, which proxies /api to the API.
+  ui:
+    build: ./ui
+    ports:
+      - "${UI_PORT:-5173}:80"
+    depends_on:
+      - api
     restart: on-failure:3
 
 volumes:
